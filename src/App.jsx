@@ -126,6 +126,7 @@ export default function App() {
   const [showAddPlayer, setShowAddPlayer] = useState(false);
   const [selectedPlay, setSelectedPlay]   = useState(null);
   const [selectedPlayer, setSelectedPlayer] = useState(null);
+  const [selectedGame, setSelectedGame]   = useState(null);
   const [saving, setSaving]               = useState(false);
 
   const [form, setForm]         = useState({ game: "", date: new Date().toISOString().slice(0,10), selectedPlayers: [], winners: [], scores: {}, coop: false });
@@ -324,7 +325,13 @@ export default function App() {
                 {games.length === 0 && <p style={{ color: "#485c78", fontStyle: "italic" }}>No games yet — add some!</p>}
                 <div style={{ display: "grid", gridTemplateColumns: isDesktop ? "1fr 1fr 1fr" : "1fr 1fr", gap: 10 }}>
                   {games.map(g => (
-                    <div key={g} style={{ background: "#1e2535", border: "1px solid #2c3d58", borderRadius: 10, padding: "12px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div key={g} onClick={() => setSelectedGame(g)} style={{
+                      background: "#1e2535", border: "1px solid #2c3d58", borderRadius: 10,
+                      padding: "12px 14px", display: "flex", justifyContent: "space-between", alignItems: "center",
+                      cursor: "pointer", transition: "border-color .15s, transform .1s",
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = "#4a6890"; e.currentTarget.style.transform = "translateY(-1px)"; }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = "#2c3d58"; e.currentTarget.style.transform = "none"; }}>
                       <span style={{ fontFamily: "'Playfair Display', serif", color: "#ffffff", fontSize: 15 }}>{g}</span>
                       <span style={{ fontSize: 11, color: "#485c78", fontFamily: "monospace" }}>{gameCounts[g] || 0}× played</span>
                     </div>
@@ -544,6 +551,57 @@ export default function App() {
           </div>
         </Modal>
       )}
+
+      {/* ── GAME DETAIL MODAL ── */}
+      {selectedGame && (() => {
+        const gamePlays = plays.filter(p => p.game === selectedGame);
+        const winCounts = {};
+        gamePlays.forEach(p => p.winners.forEach(w => { winCounts[w] = (winCounts[w] || 0) + 1; }));
+        const topWinner = Object.entries(winCounts).sort((a, b) => b[1] - a[1])[0];
+        const recentPlays = [...gamePlays].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 10);
+        return (
+          <Modal title={selectedGame} onClose={() => setSelectedGame(null)}>
+            <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
+              {[
+                { label: "Times Played", value: gamePlays.length },
+                { label: "Top Winner", value: topWinner ? topWinner[0] : "—" },
+                { label: "Top Wins", value: topWinner ? topWinner[1] : "—" },
+              ].map(s => (
+                <div key={s.label} style={{ flex: 1, background: "#252e40", borderRadius: 8, padding: "10px 8px", textAlign: "center" }}>
+                  <div style={{ fontFamily: "'Playfair Display', serif", color: "#ffffff", fontSize: 18, fontWeight: 700 }}>{s.value}</div>
+                  <div style={{ fontSize: 10, color: "#485c78", fontFamily: "monospace", textTransform: "uppercase", letterSpacing: 0.5, marginTop: 2 }}>{s.label}</div>
+                </div>
+              ))}
+            </div>
+            <div style={{ color: "#7a9fd4", fontSize: 11, fontFamily: "monospace", textTransform: "uppercase", letterSpacing: 1, marginBottom: 10 }}>Recent Plays</div>
+            {recentPlays.length === 0 && <p style={{ color: "#485c78", fontStyle: "italic", fontSize: 13 }}>No plays yet.</p>}
+            {recentPlays.map(play => (
+              <div key={play.id} style={{ background: "#252e40", borderRadius: 8, padding: "8px 10px", marginBottom: 8 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                  <span style={{ fontSize: 11, color: "#485c78", fontFamily: "monospace" }}>{play.date}</span>
+                  {play.coop && <span style={{ fontSize: 10, background: "#1a2e3a", color: "#70b090", padding: "2px 7px", borderRadius: 10, fontFamily: "monospace" }}>CO-OP</span>}
+                  {play.winners.length > 0 && <span style={{ fontSize: 12, color: "#d4aa3a" }}>🏆 {play.winners.join(", ")}</span>}
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                  {play.players.map(p => <Avatar key={p} name={p} color={getPlayerColor(p, players)} size={22} />)}
+                </div>
+                {play.scores && Object.keys(play.scores).length > 0 && (
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 6 }}>
+                    {play.players.filter(p => play.scores[p]).map(p => (
+                      <span key={p} style={{ fontSize: 11, fontFamily: "monospace", color: "#7a9fd4" }}>
+                        {p}: <span style={{ color: "#ccd6f0" }}>{play.scores[p]}</span>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>
+              <Btn variant="secondary" onClick={() => setSelectedGame(null)}>Close</Btn>
+            </div>
+          </Modal>
+        );
+      })()}
 
       {/* ── PLAYER DETAIL MODAL ── */}
       {selectedPlayer && (() => {
