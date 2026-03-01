@@ -125,6 +125,7 @@ export default function App() {
   const [showAddGame, setShowAddGame]     = useState(false);
   const [showAddPlayer, setShowAddPlayer] = useState(false);
   const [selectedPlay, setSelectedPlay]   = useState(null);
+  const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [saving, setSaving]               = useState(false);
 
   const [form, setForm]         = useState({ game: "", date: new Date().toISOString().slice(0,10), selectedPlayers: [], winners: [], scores: {}, coop: false });
@@ -333,7 +334,14 @@ export default function App() {
                 {players.length === 0 && <p style={{ color: "#485c78", fontStyle: "italic" }}>No players yet — add some!</p>}
                 <div style={{ display: isDesktop ? "grid" : "block", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                 {players.map(p => (
-                  <div key={p.name} style={{ background: "#1e2535", border: "1px solid #2c3d58", borderRadius: 12, padding: "14px 16px", marginBottom: isDesktop ? 0 : 10, display: "flex", alignItems: "center", gap: 14 }}>
+                  <div key={p.name} onClick={() => setSelectedPlayer(p)} style={{
+                    background: "#1e2535", border: "1px solid #2c3d58", borderRadius: 12,
+                    padding: "14px 16px", marginBottom: isDesktop ? 0 : 10,
+                    display: "flex", alignItems: "center", gap: 14,
+                    cursor: "pointer", transition: "border-color .15s, transform .1s",
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = "#4a6890"; e.currentTarget.style.transform = "translateY(-1px)"; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = "#2c3d58"; e.currentTarget.style.transform = "none"; }}>
                     <Avatar name={p.name} color={p.color} size={42} />
                     <div style={{ flex: 1 }}>
                       <div style={{ fontFamily: "'Playfair Display', serif", color: "#ffffff", fontSize: 16, fontWeight: 700 }}>{p.name}</div>
@@ -524,6 +532,65 @@ export default function App() {
           </div>
         </Modal>
       )}
+
+      {/* ── PLAYER DETAIL MODAL ── */}
+      {selectedPlayer && (() => {
+        const playerPlays = plays.filter(p => p.players.includes(selectedPlayer.name));
+        const playerWins  = playerPlays.filter(p => p.winners.includes(selectedPlayer.name));
+        const winRate     = playerPlays.length > 0 ? Math.round((playerWins.length / playerPlays.length) * 100) : 0;
+        const winsByGame  = {};
+        playerWins.forEach(p => { winsByGame[p.game] = (winsByGame[p.game] || 0) + 1; });
+        const topWinGame  = Object.entries(winsByGame).sort((a, b) => b[1] - a[1])[0];
+        const recentPlays = [...playerPlays].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 10);
+        return (
+          <Modal title={selectedPlayer.name} onClose={() => setSelectedPlayer(null)}>
+            <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 20 }}>
+              <Avatar name={selectedPlayer.name} color={selectedPlayer.color} size={52} />
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, flex: 1 }}>
+                {[
+                  { label: "Played", value: playerPlays.length },
+                  { label: "Won", value: playerWins.length },
+                  { label: "Win Rate", value: `${winRate}%` },
+                ].map(s => (
+                  <div key={s.label} style={{ background: "#252e40", borderRadius: 8, padding: "10px 8px", textAlign: "center" }}>
+                    <div style={{ fontFamily: "'Playfair Display', serif", color: "#ffffff", fontSize: 18, fontWeight: 700 }}>{s.value}</div>
+                    <div style={{ fontSize: 10, color: "#485c78", fontFamily: "monospace", textTransform: "uppercase", letterSpacing: 0.5, marginTop: 2 }}>{s.label}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            {topWinGame && (
+              <div style={{ background: "#252e40", borderRadius: 8, padding: "10px 14px", marginBottom: 20, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <div style={{ fontSize: 10, color: "#485c78", fontFamily: "monospace", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 3 }}>Most Wins In</div>
+                  <div style={{ fontFamily: "'Playfair Display', serif", color: "#ffffff", fontSize: 15 }}>{topWinGame[0]}</div>
+                </div>
+                <div style={{ fontFamily: "'Playfair Display', serif", color: "#d4aa3a", fontSize: 20, fontWeight: 700 }}>🏆 {topWinGame[1]}</div>
+              </div>
+            )}
+            <div style={{ color: "#7a9fd4", fontSize: 11, fontFamily: "monospace", textTransform: "uppercase", letterSpacing: 1, marginBottom: 10 }}>Recent Plays</div>
+            {recentPlays.length === 0 && <p style={{ color: "#485c78", fontStyle: "italic", fontSize: 13 }}>No plays yet.</p>}
+            {recentPlays.map(play => {
+              const won = play.winners.includes(selectedPlayer.name);
+              return (
+                <div key={play.id} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8, padding: "8px 10px", background: "#252e40", borderRadius: 8 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontFamily: "'Playfair Display', serif", color: "#ffffff", fontSize: 14 }}>{play.game}</div>
+                    <div style={{ fontSize: 11, color: "#485c78", fontFamily: "monospace", marginTop: 2 }}>{play.date}</div>
+                  </div>
+                  {won
+                    ? <span style={{ fontSize: 12, color: "#d4aa3a", fontFamily: "monospace" }}>🏆 Win</span>
+                    : <span style={{ fontSize: 12, color: "#485c78", fontFamily: "monospace" }}>Loss</span>
+                  }
+                </div>
+              );
+            })}
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>
+              <Btn variant="secondary" onClick={() => setSelectedPlayer(null)}>Close</Btn>
+            </div>
+          </Modal>
+        );
+      })()}
 
       {toast && <Toast message={toast} onDone={() => setToast(null)} />}
     </div>
