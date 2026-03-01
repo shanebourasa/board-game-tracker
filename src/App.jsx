@@ -299,6 +299,15 @@ export default function App() {
                       {play.players.map(p => <Avatar key={p} name={p} color={getPlayerColor(p, players)} size={26} />)}
                       {play.winners.length > 0 && <><span style={{ color: "#485c78", fontSize: 12 }}>·</span><span style={{ fontSize: 12, color: "#d4aa3a" }}>🏆 {play.winners.join(", ")}</span></>}
                     </div>
+                    {play.scores && Object.keys(play.scores).length > 0 && (
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
+                        {play.players.filter(p => play.scores[p]).map(p => (
+                          <span key={p} style={{ fontSize: 11, fontFamily: "monospace", color: "#7a9fd4" }}>
+                            {p}: <span style={{ color: "#ccd6f0" }}>{play.scores[p]}</span>
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ))}
                 </div>
@@ -376,12 +385,15 @@ export default function App() {
                 {leaderboard.map((p, i) => {
                   const winRate = p.plays > 0 ? Math.round((p.wins / p.plays) * 100) : 0;
                   return (
-                    <div key={p.name} style={{
+                    <div key={p.name} onClick={() => setSelectedPlayer(p)} style={{
                       background: i === 0 && p.wins > 0 ? "linear-gradient(135deg,#1e2a40,#1e2535)" : "#1e2535",
                       border: `1px solid ${i === 0 && p.wins > 0 ? "#405878" : "#2c3d58"}`,
                       borderRadius: 12, padding: "14px 16px", marginBottom: 10,
-                      display: "flex", alignItems: "center", gap: 14
-                    }}>
+                      display: "flex", alignItems: "center", gap: 14,
+                      cursor: "pointer", transition: "border-color .15s, transform .1s",
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = "#4a6890"; e.currentTarget.style.transform = "translateY(-1px)"; }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = i === 0 && p.wins > 0 ? "#405878" : "#2c3d58"; e.currentTarget.style.transform = "none"; }}>
                       <div style={{ width: 28, textAlign: "center", fontFamily: "'Playfair Display', serif", fontWeight: 700, fontSize: 16, color: i < 3 ? ["#d4aa3a","#c0c0c0","#cd8540"][i] : "#374860" }}>
                         {i < 3 ? ["🥇","🥈","🥉"][i] : i + 1}
                       </div>
