@@ -42,8 +42,8 @@ function Modal({ title, onClose, children }) {
         boxShadow: "0 24px 60px rgba(0,0,0,0.7)"
       }} onClick={e => e.stopPropagation()}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-          <h2 style={{ fontFamily: "'Playfair Display', serif", color: "#ffffff", fontSize: 22, margin: 0 }}>{title}</h2>
-          <button onClick={onClose} style={{ background: "none", border: "none", color: "#6080a0", fontSize: 22, cursor: "pointer", lineHeight: 1 }}>✕</button>
+          <h2 style={{ fontFamily: "'Playfair Display', serif", color: "#ffffff", fontSize: 25, margin: 0 }}>{title}</h2>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: "#ffffff", fontSize: 25, cursor: "pointer", lineHeight: 1 }}>✕</button>
         </div>
         {children}
       </div>
@@ -54,10 +54,10 @@ function Modal({ title, onClose, children }) {
 function Input({ label, ...props }) {
   return (
     <div style={{ marginBottom: 14 }}>
-      {label && <label style={{ display: "block", color: "#7a9fd4", fontSize: 12, fontFamily: "monospace", letterSpacing: 1, textTransform: "uppercase", marginBottom: 5 }}>{label}</label>}
+      {label && <label style={{ display: "block", color: "#ffffff", fontSize: 14, fontFamily: "monospace", letterSpacing: 1, textTransform: "uppercase", marginBottom: 5 }}>{label}</label>}
       <input {...props} style={{
         width: "100%", background: "#252e40", border: "1px solid #364a6a", borderRadius: 8,
-        color: "#ccd6f0", padding: "9px 12px", fontSize: 14, fontFamily: "Georgia, serif",
+        color: "#ffffff", padding: "9px 12px", fontSize: 16, fontFamily: "Georgia, serif",
         outline: "none", boxSizing: "border-box", ...props.style
       }} />
     </div>
@@ -67,13 +67,13 @@ function Input({ label, ...props }) {
 function Btn({ children, variant = "primary", ...props }) {
   const styles = {
     primary:   { background: "linear-gradient(135deg,#4a7ab8,#2d5a90)", color: "#e8f0ff", border: "none" },
-    secondary: { background: "transparent", color: "#7a9fd4", border: "1px solid #364a6a" },
+    secondary: { background: "transparent", color: "#ffffff", border: "1px solid #364a6a" },
     danger:    { background: "transparent", color: "#d06080", border: "1px solid #4a2840" },
   };
   return (
     <button {...props} style={{
       padding: "9px 18px", borderRadius: 8, cursor: "pointer",
-      fontFamily: "'Playfair Display', serif", fontSize: 14, fontWeight: 600,
+      fontFamily: "'Playfair Display', serif", fontSize: 16, fontWeight: 600,
       transition: "opacity .15s", ...styles[variant], ...props.style
     }}
     onMouseEnter={e => e.currentTarget.style.opacity = ".8"}
@@ -89,7 +89,7 @@ function Toast({ message, onDone }) {
     <div style={{
       position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)",
       background: "#1a2e3a", border: "1px solid #2a5048", color: "#70c090",
-      padding: "10px 20px", borderRadius: 10, fontFamily: "Georgia, serif", fontSize: 14,
+      padding: "10px 20px", borderRadius: 10, fontFamily: "Georgia, serif", fontSize: 16,
       zIndex: 200, boxShadow: "0 4px 20px rgba(0,0,0,0.5)"
     }}>
       {message}
@@ -241,7 +241,22 @@ export default function App() {
     play.winners.forEach(p => { if (stats[p]) stats[p].wins++; });
   });
   const gameCounts = {};
-  plays.forEach(p => { gameCounts[p.game] = (gameCounts[p.game] || 0) + 1; });
+  const gameLastPlayed = {};
+  const gameWinCounts = {};
+  plays.forEach(p => {
+    gameCounts[p.game] = (gameCounts[p.game] || 0) + 1;
+    if (!gameLastPlayed[p.game] || p.date > gameLastPlayed[p.game]) gameLastPlayed[p.game] = p.date;
+    if (!gameWinCounts[p.game]) gameWinCounts[p.game] = {};
+    p.winners.forEach(w => { gameWinCounts[p.game][w] = (gameWinCounts[p.game][w] || 0) + 1; });
+  });
+  const gameTopWinner = {};
+  Object.entries(gameWinCounts).forEach(([game, wc]) => {
+    const sorted = Object.entries(wc).sort((a, b) => b[1] - a[1]);
+    if (!sorted.length) return;
+    const maxWins = sorted[0][1];
+    const tied = sorted.filter(([, w]) => w === maxWins);
+    gameTopWinner[game] = { name: tied.map(([n]) => n).join(" & "), wins: maxWins };
+  });
   const topGame = Object.entries(gameCounts).sort((a,b) => b[1]-a[1])[0];
   const leaderboard = players.map(p => ({ ...p, ...stats[p.name] })).sort((a,b) => b.wins - a.wins || b.plays - a.plays);
 
@@ -250,13 +265,13 @@ export default function App() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div style={{ minHeight: "100vh", background: "#131a27", fontFamily: "Georgia, serif", color: "#ccd6f0" }}>
+    <div style={{ minHeight: "100vh", background: "#131a27", fontFamily: "Georgia, serif", color: "#ffffff" }}>
       <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&display=swap" rel="stylesheet" />
 
       {/* Header */}
       <div style={{ background: "linear-gradient(180deg,#1e2535,#171d2b)", borderBottom: "1px solid #2c3d58", padding: "20px 24px 16px" }}>
         <div style={{ maxWidth: maxW, margin: "0 auto", textAlign: "center" }}>
-          <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: 28, fontWeight: 900, color: "#ffffff", margin: 0 }}>SBZO Board Game Tracker</h1>
+          <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: 32, fontWeight: 900, color: "#ffffff", margin: 0 }}>SBZO Board Game Tracker</h1>
         </div>
       </div>
 
@@ -268,7 +283,7 @@ export default function App() {
               flex: 1, padding: "12px 6px", background: "none", border: "none",
               borderBottom: tab === t ? "2px solid #6a9ed4" : "2px solid transparent",
               color: tab === t ? "#90b8e8" : "#485c78", cursor: "pointer",
-              fontFamily: "'Playfair Display', serif", fontSize: 13, fontWeight: 600,
+              fontFamily: "'Playfair Display', serif", fontSize: 15, fontWeight: 600,
               textTransform: "capitalize", transition: "color .15s"
             }}>
               {TAB_ICONS[t]} {t.charAt(0).toUpperCase() + t.slice(1)}
@@ -280,7 +295,7 @@ export default function App() {
       <div style={{ maxWidth: maxW, margin: "0 auto", padding: "20px 16px" }}>
 
         {loading && (
-          <div style={{ textAlign: "center", padding: "60px 0", color: "#485c78", fontStyle: "italic" }}>
+          <div style={{ textAlign: "center", padding: "60px 0", color: "#ffffff", fontStyle: "italic" }}>
             Loading your game night data…
           </div>
         )}
@@ -291,12 +306,12 @@ export default function App() {
             {tab === "plays" && (
               <div>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-                  <h2 style={{ fontFamily: "'Playfair Display', serif", color: "#ffffff", margin: 0, fontSize: 18 }}>Recent Plays</h2>
+                  <h2 style={{ fontFamily: "'Playfair Display', serif", color: "#ffffff", margin: 0, fontSize: 21 }}>Recent Plays</h2>
                   <Btn onClick={() => { resetForm(); setShowAddPlay(true); }}>+ Log Play</Btn>
                 </div>
                 {plays.length === 0 && (
-                  <div style={{ textAlign: "center", padding: "48px 0", color: "#374860" }}>
-                    <div style={{ fontSize: 48, marginBottom: 12 }}>🎲</div>
+                  <div style={{ textAlign: "center", padding: "48px 0", color: "#ffffff" }}>
+                    <div style={{ fontSize: 52, marginBottom: 12 }}>🎲</div>
                     <p style={{ fontStyle: "italic" }}>No plays logged yet. Start by clicking "Log Play"!</p>
                   </div>
                 )}
@@ -310,19 +325,24 @@ export default function App() {
                   onMouseEnter={e => { e.currentTarget.style.borderColor = "#4a6890"; e.currentTarget.style.transform = "translateY(-1px)"; }}
                   onMouseLeave={e => { e.currentTarget.style.borderColor = "#2c3d58"; e.currentTarget.style.transform = "none"; }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                      <span style={{ fontFamily: "'Playfair Display', serif", fontWeight: 700, color: "#ffffff", fontSize: 16, flex: 1 }}>{play.game}</span>
-                      {play.coop && <span style={{ fontSize: 10, background: "#1a2e3a", color: "#70b090", padding: "2px 7px", borderRadius: 10, fontFamily: "monospace" }}>CO-OP</span>}
-                      <span style={{ color: "#485c78", fontSize: 12, fontFamily: "monospace" }}>{play.date}</span>
+                      <span style={{ fontFamily: "'Playfair Display', serif", fontWeight: 700, color: "#ffffff", fontSize: 19, flex: 1 }}>{play.game}</span>
+                      {play.coop && <span style={{ fontSize: 12, background: "#1a2e3a", color: "#70b090", padding: "2px 7px", borderRadius: 10, fontFamily: "monospace" }}>CO-OP</span>}
+                      <span style={{ color: "#ffffff", fontSize: 14, fontFamily: "monospace" }}>{play.date}</span>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                       {play.players.map(p => <Avatar key={p} name={p} color={getPlayerColor(p, players)} size={26} />)}
-                      {play.winners.length > 0 && <><span style={{ color: "#485c78", fontSize: 12 }}>·</span><span style={{ fontSize: 12, color: "#d4aa3a" }}>🏆 {play.winners.join(", ")}</span></>}
+                      {play.winners.length > 0 && (
+                        <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "#2a2010", border: "1px solid #6a5020", borderRadius: 8, padding: "4px 10px", marginLeft: "auto" }}>
+                          <span style={{ fontSize: 14 }}>🏆</span>
+                          <span style={{ fontSize: 15, color: "#e8c050", fontFamily: "'Playfair Display', serif", fontWeight: 700 }}>{play.winners.join(" & ")}</span>
+                        </div>
+                      )}
                     </div>
                     {play.scores && Object.keys(play.scores).length > 0 && (
                       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
                         {play.players.filter(p => play.scores[p]).map(p => (
-                          <span key={p} style={{ fontSize: 11, fontFamily: "monospace", color: "#7a9fd4" }}>
-                            {p}: <span style={{ color: "#ccd6f0" }}>{play.scores[p]}</span>
+                          <span key={p} style={{ fontSize: 13, fontFamily: "monospace", color: "#ffffff" }}>
+                            {p}: <span style={{ color: "#ffffff" }}>{play.scores[p]}</span>
                           </span>
                         ))}
                       </div>
@@ -337,21 +357,28 @@ export default function App() {
             {tab === "library" && (
               <div>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-                  <h2 style={{ fontFamily: "'Playfair Display', serif", color: "#ffffff", margin: 0, fontSize: 18 }}>Game Library</h2>
+                  <h2 style={{ fontFamily: "'Playfair Display', serif", color: "#ffffff", margin: 0, fontSize: 21 }}>Game Library</h2>
                   <Btn onClick={() => setShowAddGame(true)}>+ Add Game</Btn>
                 </div>
-                {games.length === 0 && <p style={{ color: "#485c78", fontStyle: "italic" }}>No games yet — add some!</p>}
+                {games.length === 0 && <p style={{ color: "#ffffff", fontStyle: "italic" }}>No games yet — add some!</p>}
                 <div style={{ display: "grid", gridTemplateColumns: isDesktop ? "1fr 1fr 1fr" : "1fr 1fr", gap: 10 }}>
                   {games.map(g => (
                     <div key={g} onClick={() => setSelectedGame(g)} style={{
                       background: "#1e2535", border: "1px solid #2c3d58", borderRadius: 10,
-                      padding: "12px 14px", display: "flex", justifyContent: "space-between", alignItems: "center",
-                      cursor: "pointer", transition: "border-color .15s, transform .1s",
+                      padding: "12px 14px", cursor: "pointer", transition: "border-color .15s, transform .1s",
                     }}
                     onMouseEnter={e => { e.currentTarget.style.borderColor = "#4a6890"; e.currentTarget.style.transform = "translateY(-1px)"; }}
                     onMouseLeave={e => { e.currentTarget.style.borderColor = "#2c3d58"; e.currentTarget.style.transform = "none"; }}>
-                      <span style={{ fontFamily: "'Playfair Display', serif", color: "#ffffff", fontSize: 15 }}>{g}</span>
-                      <span style={{ fontSize: 11, color: "#485c78", fontFamily: "monospace" }}>{gameCounts[g] || 0}× played</span>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: gameCounts[g] ? 8 : 0 }}>
+                        <span style={{ fontFamily: "'Playfair Display', serif", color: "#ffffff", fontSize: 17 }}>{g}</span>
+                        <span style={{ fontSize: 13, color: "#ffffff", fontFamily: "monospace", flexShrink: 0, marginLeft: 8 }}>{gameCounts[g] || 0}×</span>
+                      </div>
+                      {gameTopWinner[g] && (
+                        <div style={{ fontSize: 13, color: "#d4aa3a", fontFamily: "monospace" }}>🏆 {gameTopWinner[g].name} ({gameTopWinner[g].wins}W)</div>
+                      )}
+                      {gameLastPlayed[g] && (
+                        <div style={{ fontSize: 13, color: "#ffffff", fontFamily: "monospace", marginTop: 3 }}>Last: {gameLastPlayed[g]}</div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -362,10 +389,10 @@ export default function App() {
             {tab === "players" && (
               <div>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-                  <h2 style={{ fontFamily: "'Playfair Display', serif", color: "#ffffff", margin: 0, fontSize: 18 }}>Players</h2>
+                  <h2 style={{ fontFamily: "'Playfair Display', serif", color: "#ffffff", margin: 0, fontSize: 21 }}>Players</h2>
                   <Btn onClick={() => setShowAddPlayer(true)}>+ Add Player</Btn>
                 </div>
-                {players.length === 0 && <p style={{ color: "#485c78", fontStyle: "italic" }}>No players yet — add some!</p>}
+                {players.length === 0 && <p style={{ color: "#ffffff", fontStyle: "italic" }}>No players yet — add some!</p>}
                 <div style={{ display: isDesktop ? "grid" : "block", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                 {players.map(p => (
                   <div key={p.name} onClick={() => setSelectedPlayer(p)} style={{
@@ -378,8 +405,8 @@ export default function App() {
                   onMouseLeave={e => { e.currentTarget.style.borderColor = "#2c3d58"; e.currentTarget.style.transform = "none"; }}>
                     <Avatar name={p.name} color={p.color} size={42} />
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontFamily: "'Playfair Display', serif", color: "#ffffff", fontSize: 16, fontWeight: 700 }}>{p.name}</div>
-                      <div style={{ fontSize: 12, color: "#6080a0", marginTop: 2 }}>
+                      <div style={{ fontFamily: "'Playfair Display', serif", color: "#ffffff", fontSize: 19, fontWeight: 700 }}>{p.name}</div>
+                      <div style={{ fontSize: 14, color: "#ffffff", marginTop: 2 }}>
                         {stats[p.name]?.plays || 0} plays · {stats[p.name]?.wins || 0} wins
                         {stats[p.name]?.plays > 0 && ` · ${Math.round((stats[p.name].wins / stats[p.name].plays) * 100)}% win rate`}
                       </div>
@@ -393,7 +420,7 @@ export default function App() {
             {/* STATS TAB */}
             {tab === "stats" && (
               <div>
-                <h2 style={{ fontFamily: "'Playfair Display', serif", color: "#ffffff", margin: "0 0 16px", fontSize: 18 }}>Leaderboard</h2>
+                <h2 style={{ fontFamily: "'Playfair Display', serif", color: "#ffffff", margin: "0 0 16px", fontSize: 21 }}>Leaderboard</h2>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 20 }}>
                   {[
                     { label: "Total Plays", value: plays.length, icon: "🎲" },
@@ -401,9 +428,9 @@ export default function App() {
                     { label: "Top Game", value: topGame ? topGame[0] : "—", icon: "⭐" },
                   ].map(s => (
                     <div key={s.label} style={{ background: "#1e2535", border: "1px solid #2c3d58", borderRadius: 10, padding: 12, textAlign: "center" }}>
-                      <div style={{ fontSize: 22 }}>{s.icon}</div>
-                      <div style={{ fontFamily: "'Playfair Display', serif", color: "#ffffff", fontSize: 18, fontWeight: 700 }}>{s.value}</div>
-                      <div style={{ fontSize: 11, color: "#485c78", fontFamily: "monospace", textTransform: "uppercase", letterSpacing: 0.5 }}>{s.label}</div>
+                      <div style={{ fontSize: 25 }}>{s.icon}</div>
+                      <div style={{ fontFamily: "'Playfair Display', serif", color: "#ffffff", fontSize: 21, fontWeight: 700 }}>{s.value}</div>
+                      <div style={{ fontSize: 13, color: "#ffffff", fontFamily: "monospace", textTransform: "uppercase", letterSpacing: 0.5 }}>{s.label}</div>
                     </div>
                   ))}
                 </div>
@@ -419,17 +446,17 @@ export default function App() {
                     }}
                     onMouseEnter={e => { e.currentTarget.style.borderColor = "#4a6890"; e.currentTarget.style.transform = "translateY(-1px)"; }}
                     onMouseLeave={e => { e.currentTarget.style.borderColor = i === 0 && p.wins > 0 ? "#405878" : "#2c3d58"; e.currentTarget.style.transform = "none"; }}>
-                      <div style={{ width: 28, textAlign: "center", fontFamily: "'Playfair Display', serif", fontWeight: 700, fontSize: 16, color: i < 3 ? ["#d4aa3a","#c0c0c0","#cd8540"][i] : "#374860" }}>
+                      <div style={{ width: 28, textAlign: "center", fontFamily: "'Playfair Display', serif", fontWeight: 700, fontSize: 19, color: i < 3 ? ["#d4aa3a","#c0c0c0","#cd8540"][i] : "#ffffff" }}>
                         {i < 3 ? ["🥇","🥈","🥉"][i] : i + 1}
                       </div>
                       <Avatar name={p.name} color={p.color} size={38} />
                       <div style={{ flex: 1 }}>
                         <div style={{ fontFamily: "'Playfair Display', serif", color: "#ffffff", fontWeight: 700 }}>{p.name}</div>
-                        <div style={{ fontSize: 12, color: "#6080a0" }}>{p.plays} plays · {p.wins} wins</div>
+                        <div style={{ fontSize: 14, color: "#ffffff" }}>{p.plays} plays · {p.wins} wins</div>
                       </div>
                       <div style={{ textAlign: "right" }}>
-                        <div style={{ fontFamily: "'Playfair Display', serif", color: "#d4aa3a", fontWeight: 700, fontSize: 18 }}>{winRate}%</div>
-                        <div style={{ fontSize: 10, color: "#485c78", fontFamily: "monospace" }}>WIN RATE</div>
+                        <div style={{ fontFamily: "'Playfair Display', serif", color: "#d4aa3a", fontWeight: 700, fontSize: 21 }}>{winRate}%</div>
+                        <div style={{ fontSize: 12, color: "#ffffff", fontFamily: "monospace" }}>WIN RATE</div>
                       </div>
                     </div>
                   );
@@ -444,10 +471,10 @@ export default function App() {
       {showAddPlay && (
         <Modal title={editingPlay ? "Edit Play" : "Log a Play"} onClose={() => { setShowAddPlay(false); setEditingPlay(null); resetForm(); }}>
           <div style={{ marginBottom: 14 }}>
-            <label style={{ display: "block", color: "#7a9fd4", fontSize: 12, fontFamily: "monospace", letterSpacing: 1, textTransform: "uppercase", marginBottom: 5 }}>Game</label>
+            <label style={{ display: "block", color: "#ffffff", fontSize: 14, fontFamily: "monospace", letterSpacing: 1, textTransform: "uppercase", marginBottom: 5 }}>Game</label>
             <select value={form.game} onChange={e => setForm(f => ({ ...f, game: e.target.value }))} style={{
               width: "100%", background: "#252e40", border: "1px solid #364a6a", borderRadius: 8,
-              color: "#ccd6f0", padding: "9px 12px", fontSize: 14, fontFamily: "Georgia, serif", outline: "none", boxSizing: "border-box"
+              color: "#ffffff", padding: "9px 12px", fontSize: 16, fontFamily: "Georgia, serif", outline: "none", boxSizing: "border-box"
             }}>
               <option value="">Select a game…</option>
               {games.map(g => <option key={g} value={g}>{g}</option>)}
@@ -455,7 +482,7 @@ export default function App() {
           </div>
           <Input label="Date" type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} />
           <div style={{ marginBottom: 14 }}>
-            <label style={{ display: "block", color: "#7a9fd4", fontSize: 12, fontFamily: "monospace", letterSpacing: 1, textTransform: "uppercase", marginBottom: 8 }}>Players</label>
+            <label style={{ display: "block", color: "#ffffff", fontSize: 14, fontFamily: "monospace", letterSpacing: 1, textTransform: "uppercase", marginBottom: 8 }}>Players</label>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
               {players.map(p => {
                 const sel = form.selectedPlayers.includes(p.name);
@@ -464,7 +491,7 @@ export default function App() {
                     display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 20,
                     border: sel ? `1px solid ${p.color}` : "1px solid #2c3d58",
                     background: sel ? `${p.color}22` : "transparent", cursor: "pointer",
-                    color: sel ? p.color : "#485c78", fontFamily: "Georgia, serif", fontSize: 13
+                    color: sel ? p.color : "#485c78", fontFamily: "Georgia, serif", fontSize: 15
                   }}>
                     <Avatar name={p.name} color={p.color} size={20} />{p.name}
                   </button>
@@ -475,7 +502,7 @@ export default function App() {
           {form.selectedPlayers.length >= 2 && (
             <>
               <div style={{ marginBottom: 14 }}>
-                <label style={{ display: "block", color: "#7a9fd4", fontSize: 12, fontFamily: "monospace", letterSpacing: 1, textTransform: "uppercase", marginBottom: 8 }}>✌️ RPS — Who Goes First? <span style={{ color: "#485c78" }}>(optional)</span></label>
+                <label style={{ display: "block", color: "#ffffff", fontSize: 14, fontFamily: "monospace", letterSpacing: 1, textTransform: "uppercase", marginBottom: 8 }}>✌️ RPS — Who Goes First? <span style={{ color: "#ffffff" }}>(optional)</span></label>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                   {form.selectedPlayers.map(name => {
                     const sel = form.rpsWinner === name;
@@ -485,7 +512,7 @@ export default function App() {
                         display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 20,
                         border: sel ? `1px solid #70b090` : "1px solid #2c3d58",
                         background: sel ? "#1a3028" : "transparent", cursor: "pointer",
-                        color: sel ? "#70b090" : "#485c78", fontFamily: "Georgia, serif", fontSize: 13
+                        color: sel ? "#70b090" : "#485c78", fontFamily: "Georgia, serif", fontSize: 15
                       }}>
                         <Avatar name={name} color={p?.color || "#888"} size={20} />{name}
                       </button>
@@ -495,8 +522,8 @@ export default function App() {
               </div>
               <div style={{ marginBottom: 14 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                  <label style={{ color: "#7a9fd4", fontSize: 12, fontFamily: "monospace", letterSpacing: 1, textTransform: "uppercase" }}>Winner{form.coop ? "s" : ""}</label>
-                  <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 12, color: "#506478" }}>
+                  <label style={{ color: "#ffffff", fontSize: 14, fontFamily: "monospace", letterSpacing: 1, textTransform: "uppercase" }}>Winner{form.coop ? "s" : ""}</label>
+                  <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 14, color: "#ffffff" }}>
                     <input type="checkbox" checked={form.coop} onChange={e => setForm(f => ({ ...f, coop: e.target.checked, winners: [] }))} />
                     Co-op mode
                   </label>
@@ -509,7 +536,7 @@ export default function App() {
                         display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 20,
                         border: win ? "1px solid #d4aa3a" : "1px solid #2c3d58",
                         background: win ? "#2a2510" : "transparent", cursor: "pointer",
-                        color: win ? "#d4aa3a" : "#485c78", fontFamily: "Georgia, serif", fontSize: 13
+                        color: win ? "#d4aa3a" : "#485c78", fontFamily: "Georgia, serif", fontSize: 15
                       }}>
                         {win && "🏆 "}{name}
                       </button>
@@ -518,14 +545,14 @@ export default function App() {
                 </div>
               </div>
               <div style={{ marginBottom: 16 }}>
-                <label style={{ display: "block", color: "#7a9fd4", fontSize: 12, fontFamily: "monospace", letterSpacing: 1, textTransform: "uppercase", marginBottom: 8 }}>Scores (optional)</label>
+                <label style={{ display: "block", color: "#ffffff", fontSize: 14, fontFamily: "monospace", letterSpacing: 1, textTransform: "uppercase", marginBottom: 8 }}>Scores (optional)</label>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                   {form.selectedPlayers.map(name => (
                     <div key={name} style={{ display: "flex", alignItems: "center", gap: 8 }}>
                       <Avatar name={name} color={getPlayerColor(name, players)} size={22} />
                       <input type="number" placeholder="Score" value={form.scores[name] || ""} onChange={e => setForm(f => ({ ...f, scores: { ...f.scores, [name]: e.target.value } }))} style={{
                         flex: 1, background: "#252e40", border: "1px solid #364a6a", borderRadius: 6,
-                        color: "#ccd6f0", padding: "7px 10px", fontSize: 13, outline: "none", boxSizing: "border-box"
+                        color: "#ffffff", padding: "7px 10px", fontSize: 15, outline: "none", boxSizing: "border-box"
                       }} />
                     </div>
                   ))}
@@ -567,12 +594,12 @@ export default function App() {
       {/* ── PLAY DETAIL MODAL ── */}
       {selectedPlay && (
         <Modal title={selectedPlay.game} onClose={() => setSelectedPlay(null)}>
-          <div style={{ marginBottom: 12, fontSize: 13, color: "#6080a0", fontFamily: "monospace" }}>{selectedPlay.date}</div>
+          <div style={{ marginBottom: 12, fontSize: 15, color: "#ffffff", fontFamily: "monospace" }}>{selectedPlay.date}</div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
-            {selectedPlay.coop && <span style={{ fontSize: 11, background: "#1a2e3a", color: "#70b090", padding: "2px 8px", borderRadius: 10, fontFamily: "monospace" }}>CO-OP</span>}
-            {selectedPlay.rps_winner && <span style={{ fontSize: 11, background: "#1a2e3a", color: "#70b090", padding: "2px 8px", borderRadius: 10, fontFamily: "monospace" }}>✌️ {selectedPlay.rps_winner} went first</span>}
+            {selectedPlay.coop && <span style={{ fontSize: 13, background: "#1a2e3a", color: "#70b090", padding: "2px 8px", borderRadius: 10, fontFamily: "monospace" }}>CO-OP</span>}
+            {selectedPlay.rps_winner && <span style={{ fontSize: 13, background: "#1a2e3a", color: "#70b090", padding: "2px 8px", borderRadius: 10, fontFamily: "monospace" }}>✌️ {selectedPlay.rps_winner} went first</span>}
           </div>
-          <div style={{ color: "#7a9fd4", fontSize: 11, fontFamily: "monospace", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>Players</div>
+          <div style={{ color: "#ffffff", fontSize: 13, fontFamily: "monospace", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>Players</div>
           {selectedPlay.players.map(name => {
             const p = players.find(x => x.name === name);
             const isWinner = selectedPlay.winners.includes(name);
@@ -580,8 +607,8 @@ export default function App() {
             return (
               <div key={name} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
                 <Avatar name={name} color={p?.color || "#888"} size={32} />
-                <span style={{ fontFamily: "'Playfair Display', serif", color: isWinner ? "#d4aa3a" : "#ccd6f0", flex: 1 }}>{name} {isWinner && "🏆"}</span>
-                {score && <span style={{ fontFamily: "monospace", color: "#7a9fd4", fontSize: 14 }}>{score} pts</span>}
+                <span style={{ fontFamily: "'Playfair Display', serif", color: isWinner ? "#d4aa3a" : "#ffffff", flex: 1 }}>{name} {isWinner && "🏆"}</span>
+                {score && <span style={{ fontFamily: "monospace", color: "#ffffff", fontSize: 16 }}>{score} pts</span>}
               </div>
             );
           })}
@@ -609,19 +636,19 @@ export default function App() {
                 { label: "Top Wins", value: topWinner ? topWinner[1] : "—" },
               ].map(s => (
                 <div key={s.label} style={{ flex: 1, background: "#252e40", borderRadius: 8, padding: "10px 8px", textAlign: "center" }}>
-                  <div style={{ fontFamily: "'Playfair Display', serif", color: "#ffffff", fontSize: 18, fontWeight: 700 }}>{s.value}</div>
-                  <div style={{ fontSize: 10, color: "#485c78", fontFamily: "monospace", textTransform: "uppercase", letterSpacing: 0.5, marginTop: 2 }}>{s.label}</div>
+                  <div style={{ fontFamily: "'Playfair Display', serif", color: "#ffffff", fontSize: 21, fontWeight: 700 }}>{s.value}</div>
+                  <div style={{ fontSize: 12, color: "#ffffff", fontFamily: "monospace", textTransform: "uppercase", letterSpacing: 0.5, marginTop: 2 }}>{s.label}</div>
                 </div>
               ))}
             </div>
-            <div style={{ color: "#7a9fd4", fontSize: 11, fontFamily: "monospace", textTransform: "uppercase", letterSpacing: 1, marginBottom: 10 }}>Recent Plays</div>
-            {recentPlays.length === 0 && <p style={{ color: "#485c78", fontStyle: "italic", fontSize: 13 }}>No plays yet.</p>}
+            <div style={{ color: "#ffffff", fontSize: 13, fontFamily: "monospace", textTransform: "uppercase", letterSpacing: 1, marginBottom: 10 }}>Recent Plays</div>
+            {recentPlays.length === 0 && <p style={{ color: "#ffffff", fontStyle: "italic", fontSize: 15 }}>No plays yet.</p>}
             {recentPlays.map(play => (
               <div key={play.id} onClick={() => { setSelectedGame(null); setSelectedPlay(play); }} style={{ background: "#252e40", borderRadius: 8, padding: "8px 10px", marginBottom: 8, cursor: "pointer" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-                  <span style={{ fontSize: 11, color: "#485c78", fontFamily: "monospace" }}>{play.date}</span>
-                  {play.coop && <span style={{ fontSize: 10, background: "#1a2e3a", color: "#70b090", padding: "2px 7px", borderRadius: 10, fontFamily: "monospace" }}>CO-OP</span>}
-                  {play.winners.length > 0 && <span style={{ fontSize: 12, color: "#d4aa3a" }}>🏆 {play.winners.join(", ")}</span>}
+                  <span style={{ fontSize: 13, color: "#ffffff", fontFamily: "monospace" }}>{play.date}</span>
+                  {play.coop && <span style={{ fontSize: 12, background: "#1a2e3a", color: "#70b090", padding: "2px 7px", borderRadius: 10, fontFamily: "monospace" }}>CO-OP</span>}
+                  {play.winners.length > 0 && <span style={{ fontSize: 14, color: "#d4aa3a" }}>🏆 {play.winners.join(", ")}</span>}
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                   {play.players.map(p => <Avatar key={p} name={p} color={getPlayerColor(p, players)} size={22} />)}
@@ -629,8 +656,8 @@ export default function App() {
                 {play.scores && Object.keys(play.scores).length > 0 && (
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 6 }}>
                     {play.players.filter(p => play.scores[p]).map(p => (
-                      <span key={p} style={{ fontSize: 11, fontFamily: "monospace", color: "#7a9fd4" }}>
-                        {p}: <span style={{ color: "#ccd6f0" }}>{play.scores[p]}</span>
+                      <span key={p} style={{ fontSize: 13, fontFamily: "monospace", color: "#ffffff" }}>
+                        {p}: <span style={{ color: "#ffffff" }}>{play.scores[p]}</span>
                       </span>
                     ))}
                   </div>
@@ -653,6 +680,9 @@ export default function App() {
         playerWins.forEach(p => { winsByGame[p.game] = (winsByGame[p.game] || 0) + 1; });
         const topWinGame  = Object.entries(winsByGame).sort((a, b) => b[1] - a[1])[0];
         const recentPlays = [...playerPlays].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 10);
+        const leadingGames = Object.entries(gameTopWinner)
+          .filter(([, v]) => v.name.split(" & ").includes(selectedPlayer.name))
+          .sort((a, b) => b[1].wins - a[1].wins);
         return (
           <Modal title={selectedPlayer.name} onClose={() => setSelectedPlayer(null)}>
             <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 20 }}>
@@ -664,8 +694,8 @@ export default function App() {
                   { label: "Win Rate", value: `${winRate}%` },
                 ].map(s => (
                   <div key={s.label} style={{ background: "#252e40", borderRadius: 8, padding: "10px 8px", textAlign: "center" }}>
-                    <div style={{ fontFamily: "'Playfair Display', serif", color: "#ffffff", fontSize: 18, fontWeight: 700 }}>{s.value}</div>
-                    <div style={{ fontSize: 10, color: "#485c78", fontFamily: "monospace", textTransform: "uppercase", letterSpacing: 0.5, marginTop: 2 }}>{s.label}</div>
+                    <div style={{ fontFamily: "'Playfair Display', serif", color: "#ffffff", fontSize: 21, fontWeight: 700 }}>{s.value}</div>
+                    <div style={{ fontSize: 12, color: "#ffffff", fontFamily: "monospace", textTransform: "uppercase", letterSpacing: 0.5, marginTop: 2 }}>{s.label}</div>
                   </div>
                 ))}
               </div>
@@ -673,25 +703,38 @@ export default function App() {
             {topWinGame && (
               <div style={{ background: "#252e40", borderRadius: 8, padding: "10px 14px", marginBottom: 20, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div>
-                  <div style={{ fontSize: 10, color: "#485c78", fontFamily: "monospace", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 3 }}>Most Wins In</div>
-                  <div style={{ fontFamily: "'Playfair Display', serif", color: "#ffffff", fontSize: 15 }}>{topWinGame[0]}</div>
+                  <div style={{ fontSize: 12, color: "#ffffff", fontFamily: "monospace", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 3 }}>Most Wins In</div>
+                  <div style={{ fontFamily: "'Playfair Display', serif", color: "#ffffff", fontSize: 17 }}>{topWinGame[0]}</div>
                 </div>
-                <div style={{ fontFamily: "'Playfair Display', serif", color: "#d4aa3a", fontSize: 20, fontWeight: 700 }}>🏆 {topWinGame[1]}</div>
+                <div style={{ fontFamily: "'Playfair Display', serif", color: "#d4aa3a", fontSize: 23, fontWeight: 700 }}>🏆 {topWinGame[1]}</div>
               </div>
             )}
-            <div style={{ color: "#7a9fd4", fontSize: 11, fontFamily: "monospace", textTransform: "uppercase", letterSpacing: 1, marginBottom: 10 }}>Recent Plays</div>
-            {recentPlays.length === 0 && <p style={{ color: "#485c78", fontStyle: "italic", fontSize: 13 }}>No plays yet.</p>}
+            {leadingGames.length > 0 && (
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ color: "#ffffff", fontSize: 13, fontFamily: "monospace", textTransform: "uppercase", letterSpacing: 1, marginBottom: 10 }}>👑 Leading In</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {leadingGames.map(([game, { wins }]) => (
+                    <div key={game} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#252e40", borderRadius: 8, padding: "8px 12px" }}>
+                      <span style={{ fontFamily: "'Playfair Display', serif", color: "#ffffff", fontSize: 15 }}>{game}</span>
+                      <span style={{ fontFamily: "monospace", color: "#d4aa3a", fontSize: 14 }}>{wins} win{wins !== 1 ? "s" : ""}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div style={{ color: "#ffffff", fontSize: 13, fontFamily: "monospace", textTransform: "uppercase", letterSpacing: 1, marginBottom: 10 }}>Recent Plays</div>
+            {recentPlays.length === 0 && <p style={{ color: "#ffffff", fontStyle: "italic", fontSize: 15 }}>No plays yet.</p>}
             {recentPlays.map(play => {
               const won = play.winners.includes(selectedPlayer.name);
               return (
                 <div key={play.id} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8, padding: "8px 10px", background: "#252e40", borderRadius: 8 }}>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontFamily: "'Playfair Display', serif", color: "#ffffff", fontSize: 14 }}>{play.game}</div>
-                    <div style={{ fontSize: 11, color: "#485c78", fontFamily: "monospace", marginTop: 2 }}>{play.date}</div>
+                    <div style={{ fontFamily: "'Playfair Display', serif", color: "#ffffff", fontSize: 16 }}>{play.game}</div>
+                    <div style={{ fontSize: 13, color: "#ffffff", fontFamily: "monospace", marginTop: 2 }}>{play.date}</div>
                   </div>
                   {won
-                    ? <span style={{ fontSize: 12, color: "#d4aa3a", fontFamily: "monospace" }}>🏆 Win</span>
-                    : <span style={{ fontSize: 12, color: "#485c78", fontFamily: "monospace" }}>Loss</span>
+                    ? <span style={{ fontSize: 14, color: "#d4aa3a", fontFamily: "monospace" }}>🏆 Win</span>
+                    : <span style={{ fontSize: 14, color: "#ffffff", fontFamily: "monospace" }}>Loss</span>
                   }
                 </div>
               );
