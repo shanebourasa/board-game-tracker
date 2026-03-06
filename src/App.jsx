@@ -141,6 +141,9 @@ export default function App() {
   const [saving, setSaving]               = useState(false);
   const [editingPlay, setEditingPlay]     = useState(null);
   const [aliasInput, setAliasInput]       = useState("");
+  const [playsPage, setPlaysPage]         = useState(1);
+  const [playsSearch, setPlaysSearch]     = useState("");
+  const PLAYS_PER_PAGE = 20;
 
   const [form, setForm]         = useState({ game: "", date: new Date().toISOString().slice(0,10), selectedPlayers: [], winners: [], scores: {}, coop: false, rpsWinner: "", rpsPlayers: [] });
   const [newGame, setNewGame]   = useState("");
@@ -288,12 +291,39 @@ export default function App() {
     p.winners.forEach(w => { gameWinCounts[p.game][w] = (gameWinCounts[p.game][w] || 0) + 1; });
   });
   const gameTopWinner = {};
+  const gamePodium = {};
   Object.entries(gameWinCounts).forEach(([game, wc]) => {
     const sorted = Object.entries(wc).sort((a, b) => b[1] - a[1]);
     if (!sorted.length) return;
     const maxWins = sorted[0][1];
     const tied = sorted.filter(([, w]) => w === maxWins);
     gameTopWinner[game] = { name: tied.map(([n]) => getAlias(n, players)).join(" & "), wins: maxWins };
+    const podium = [];
+    let prevWins = null;
+    for (const [name, wins] of sorted) {
+      if (podium.length >= 3 && wins < prevWins) break;
+      if (wins !== prevWins) {
+        if (podium.length >= 3) break;
+        podium.push({ names: [getAlias(name, players)], wins });
+        prevWins = wins;
+      } else {
+        podium[podium.length - 1].names.push(getAlias(name, players));
+      }
+    }
+    gamePodium[game] = podium;
+  });
+  const playerMedals = {};
+  players.forEach(p => { playerMedals[p.name] = { gold: 0, silver: 0, bronze: 0 }; });
+  Object.values(gameWinCounts).forEach(wc => {
+    const sorted = Object.entries(wc).sort((a, b) => b[1] - a[1]);
+    let rank = 0, prevWins = null, groups = [];
+    for (const [name, wins] of sorted) {
+      if (wins !== prevWins) { if (rank >= 3) break; rank++; prevWins = wins; groups.push([name]); }
+      else groups[groups.length - 1].push(name);
+    }
+    groups.forEach((names, i) => names.forEach(name => {
+      if (playerMedals[name]) playerMedals[name][["gold","silver","bronze"][i]]++;
+    }));
   });
   const topGame = Object.entries(gameCounts).sort((a,b) => b[1]-a[1])[0];
   const leaderboard = players.map(p => ({ ...p, ...stats[p.name] })).sort((a,b) => b.wins - a.wins || b.plays - a.plays);
@@ -355,7 +385,36 @@ export default function App() {
                   </div>
                 )}
                 <div>
-                {[...plays].sort((a, b) => new Date(b.date) - new Date(a.date) || new Date(b.created_at) - new Date(a.created_at)).map(play => (
+                {(() => {
+                  const q = playsSearch.trim().toLowerCase();
+                  const sorted = [...plays]
+                    .filter(p => !q || p.game.toLowerCase().includes(q) || p.players.some(n => getAlias(n, players).toLowerCase().includes(q) || n.toLowerCase().includes(q)))
+                    .sort((a, b) => new Date(b.date) - new Date(a.date) || new Date(b.created_at) - new Date(a.created_at));
+                  const totalPages = Math.max(1, Math.ceil(sorted.length / PLAYS_PER_PAGE));
+                  const page = Math.min(playsPage, totalPages);
+                  const pagePlays = sorted.slice((page - 1) * PLAYS_PER_PAGE, page * PLAYS_PER_PAGE);
+                  const rangeStart = sorted.length === 0 ? 0 : (page - 1) * PLAYS_PER_PAGE + 1;
+                  const rangeEnd = Math.min(page * PLAYS_PER_PAGE, sorted.length);
+                  return (<>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+                  <input
+                    value={playsSearch}
+                    onChange={e => { setPlaysSearch(e.target.value); setPlaysPage(1); }}
+                    placeholder="Search by game or player…"
+                    style={{
+                      flex: 1, background: "#1e2535", border: "1px solid #2c3d58", borderRadius: 8,
+                      color: "#ffffff", padding: "9px 14px", fontSize: 15, fontFamily: "Georgia, serif",
+                      outline: "none", boxSizing: "border-box",
+                    }}
+                  />
+                  <span style={{ fontFamily: "monospace", fontSize: 13, color: "#ffffff", whiteSpace: "nowrap", flexShrink: 0 }}>
+                    {rangeStart}–{rangeEnd} of {sorted.length}
+                  </span>
+                </div>
+                {sorted.length === 0 && plays.length > 0 && (
+                  <div style={{ textAlign: "center", padding: "32px 0", color: "#ffffff", fontStyle: "italic" }}>No plays match your search.</div>
+                )}
+                {pagePlays.map(play => (
                   <div key={play.id} onClick={() => setSelectedPlay(play)} style={{
                     background: "#1e2535", border: "1px solid #2c3d58", borderRadius: 12,
                     padding: "14px 16px", marginBottom: 10, cursor: "pointer",
@@ -379,16 +438,35 @@ export default function App() {
                       )}
                     </div>
                     {play.scores && Object.keys(play.scores).length > 0 && (
-                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
+                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
                         {play.players.filter(p => play.scores[p]).map(p => (
-                          <span key={p} style={{ fontSize: 13, fontFamily: "monospace", color: "#ffffff" }}>
-                            {getAlias(p, players)}: <span style={{ color: "#ffffff" }}>{play.scores[p]}</span>
+                          <span key={p} style={{ fontSize: 12, background: "#1a2438", border: "1px solid #2c4060", borderRadius: 8, color: "#ffffff", padding: "2px 8px", fontFamily: "monospace" }}>
+                            {getAlias(p, players)}: {play.scores[p]}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {play.rps_players?.length >= 2 && (
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 7, flexWrap: "wrap" }}>
+                        <span style={{ fontSize: 12, color: "#ffffff", fontFamily: "monospace" }}>✌️ RPS:</span>
+                        {play.rps_players.map(p => (
+                          <span key={p} style={{ fontSize: 12, background: "#1a2438", border: "1px solid #2c4060", borderRadius: 8, color: "#ffffff", padding: "2px 8px", fontFamily: "monospace" }}>
+                            {getAlias(p, players)}
                           </span>
                         ))}
                       </div>
                     )}
                   </div>
                 ))}
+                {totalPages > 1 && (
+                  <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 12, marginTop: 16 }}>
+                    <Btn variant="secondary" onClick={() => setPlaysPage(p => Math.max(1, p - 1))} style={{ opacity: page === 1 ? 0.3 : 1, padding: "7px 14px" }}>← Prev</Btn>
+                    <span style={{ fontFamily: "monospace", color: "#ffffff", fontSize: 14 }}>Page {page} of {totalPages}</span>
+                    <Btn variant="secondary" onClick={() => setPlaysPage(p => Math.min(totalPages, p + 1))} style={{ opacity: page === totalPages ? 0.3 : 1, padding: "7px 14px" }}>Next →</Btn>
+                  </div>
+                )}
+                </>);
+                })()}
                 </div>
               </div>
             )}
@@ -414,9 +492,11 @@ export default function App() {
                         <span style={{ fontFamily: "'Playfair Display', serif", color: "#ffffff", fontSize: 17 }}>{g}</span>
                         <span style={{ fontSize: 13, color: "#ffffff", fontFamily: "monospace", flexShrink: 0, marginLeft: 8 }}>{gameCounts[g] || 0}×</span>
                       </div>
-                      {gameTopWinner[g] && (
-                        <div style={{ fontSize: 13, color: "#d4aa3a", fontFamily: "monospace" }}>🏆 {gameTopWinner[g].name} ({gameTopWinner[g].wins}W)</div>
-                      )}
+                      {(gamePodium[g] || []).map((entry, i) => (
+                        <div key={i} style={{ fontSize: 13, color: ["#d4aa3a","#c0c0c0","#cd8540"][i], fontFamily: "monospace", marginBottom: 2 }}>
+                          {["🥇","🥈","🥉"][i]} {entry.names.join(" & ")} | {entry.wins} {entry.wins === 1 ? "Win" : "Wins"}
+                        </div>
+                      ))}
                       {gameLastPlayed[g] && (
                         <div style={{ fontSize: 13, color: "#ffffff", fontFamily: "monospace", marginTop: 3 }}>Last: {gameLastPlayed[g]}</div>
                       )}
@@ -447,11 +527,28 @@ export default function App() {
                   onMouseLeave={e => { e.currentTarget.style.borderColor = "#2c3d58"; e.currentTarget.style.transform = "none"; }}>
                     <Avatar name={p.alias || p.name} color={p.color} size={42} />
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontFamily: "'Playfair Display', serif", color: "#ffffff", fontSize: 19, fontWeight: 700 }}>{p.alias || p.name}</div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ fontFamily: "'Playfair Display', serif", color: "#ffffff", fontSize: 19, fontWeight: 700 }}>{p.alias || p.name}</span>
+                        <span style={{ fontSize: 14 }}>
+                          {playerMedals[p.name]?.gold > 0 && `🥇${playerMedals[p.name].gold}`}
+                          {playerMedals[p.name]?.silver > 0 && ` 🥈${playerMedals[p.name].silver}`}
+                          {playerMedals[p.name]?.bronze > 0 && ` 🥉${playerMedals[p.name].bronze}`}
+                        </span>
+                      </div>
                       <div style={{ fontSize: 14, color: "#ffffff", marginTop: 2 }}>
                         {stats[p.name]?.plays || 0} plays · {stats[p.name]?.wins || 0} wins
                         {stats[p.name]?.plays > 0 && ` · ${Math.round((stats[p.name].wins / stats[p.name].plays) * 100)}% win rate`}
                       </div>
+                      {(() => {
+                        const rpsPlays = plays.filter(pl => pl.rps_players?.includes(p.name)).length;
+                        const rpsW = rpsWins[p.name] || 0;
+                        if (!rpsPlays) return null;
+                        return (
+                          <div style={{ fontSize: 13, color: "#90b8e8", marginTop: 2 }}>
+                            ✌️ {rpsPlays} RPS · {rpsW} wins · {Math.round((rpsW / rpsPlays) * 100)}% win rate
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
                 ))}
