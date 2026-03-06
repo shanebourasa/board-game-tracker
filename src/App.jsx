@@ -9,11 +9,22 @@ const supabase = createClient(
 
 // ── Constants ────────────────────────────────────────────────────────────────
 const COLORS = ["#e07b54","#5b9bd5","#6dbf8b","#c07dd4","#e6b84a","#e05470","#5bbfbf","#a0b060"];
+const COLOR_PALETTE = [
+  "#e07b54","#e05470","#e6b84a","#6dbf8b","#5bbfbf","#5b9bd5","#7b8de0","#c07dd4",
+  "#a0b060","#d4826a","#e8a0b4","#70c8a0","#60a8d4","#a888e0","#d4aa3a","#e06890",
+  "#88c860","#50b8d0","#9870d0","#d06080","#f0a030","#40c0a0","#8060d0","#c84040",
+  "#30b060","#d080c0","#70a030","#4080c0",
+];
 
 // ── Small UI helpers ─────────────────────────────────────────────────────────
 function getPlayerColor(name, players) {
   const idx = players.findIndex(p => p.name === name);
   return idx >= 0 ? players[idx].color : "#888";
+}
+
+function getAlias(name, players) {
+  const p = players.find(p => p.name === name);
+  return p?.alias || name;
 }
 
 function Avatar({ name, color, size = 32 }) {
@@ -129,8 +140,9 @@ export default function App() {
   const [selectedGame, setSelectedGame]   = useState(null);
   const [saving, setSaving]               = useState(false);
   const [editingPlay, setEditingPlay]     = useState(null);
+  const [aliasInput, setAliasInput]       = useState("");
 
-  const [form, setForm]         = useState({ game: "", date: new Date().toISOString().slice(0,10), selectedPlayers: [], winners: [], scores: {}, coop: false, rpsWinner: "" });
+  const [form, setForm]         = useState({ game: "", date: new Date().toISOString().slice(0,10), selectedPlayers: [], winners: [], scores: {}, coop: false, rpsWinner: "", rpsPlayers: [] });
   const [newGame, setNewGame]   = useState("");
   const [newPlayer, setNewPlayer] = useState("");
 
@@ -143,22 +155,24 @@ export default function App() {
       supabase.from("plays").select("*").order("created_at", { ascending: false }),
     ]);
     if (gData)  setGames(gData.map(g => g.name));
-    if (pData)  setPlayers(pData.map(p => ({ name: p.name, color: p.color })));
+    if (pData)  setPlayers(pData.map(p => ({ name: p.name, color: p.color, alias: p.alias || "" })));
     if (plData) setPlays(plData);
     setLoading(false);
   }, []);
 
   useEffect(() => { loadAll(); }, [loadAll]);
+  useEffect(() => { setAliasInput(selectedPlayer?.alias || ""); }, [selectedPlayer]);
 
   function notify(msg) { setToast(msg); }
-  function resetForm() { setForm({ game: "", date: new Date().toISOString().slice(0,10), selectedPlayers: [], winners: [], scores: {}, coop: false, rpsWinner: "" }); }
+  function resetForm() { setForm({ game: "", date: new Date().toISOString().slice(0,10), selectedPlayers: [], winners: [], scores: {}, coop: false, rpsWinner: "", rpsPlayers: [] }); }
 
   // ── Form helpers ───────────────────────────────────────────────────────────
   function togglePlayer(name) {
     setForm(f => {
       const has = f.selectedPlayers.includes(name);
       const selectedPlayers = has ? f.selectedPlayers.filter(p => p !== name) : [...f.selectedPlayers, name];
-      return { ...f, selectedPlayers, winners: f.winners.filter(w => selectedPlayers.includes(w)) };
+      const rpsPlayers = f.rpsPlayers.filter(p => selectedPlayers.includes(p));
+      return { ...f, selectedPlayers, winners: f.winners.filter(w => selectedPlayers.includes(w)), rpsPlayers, rpsWinner: rpsPlayers.includes(f.rpsWinner) ? f.rpsWinner : "" };
     });
   }
 
@@ -173,7 +187,7 @@ export default function App() {
     setForm({
       game: play.game, date: play.date, selectedPlayers: play.players,
       winners: play.winners, scores: play.scores || {}, coop: play.coop || false,
-      rpsWinner: play.rps_winner || "",
+      rpsWinner: play.rps_winner || "", rpsPlayers: play.rps_players || [],
     });
     setEditingPlay(play);
     setSelectedPlay(null);
@@ -188,7 +202,8 @@ export default function App() {
     const payload = {
       game: form.game, date: form.date, players: form.selectedPlayers,
       winners: form.winners, scores: form.scores, coop: form.coop,
-      rps_winner: form.rpsWinner || null,
+      rps_players: form.rpsPlayers.length >= 2 ? form.rpsPlayers : null,
+      rps_winner: form.rpsPlayers.length >= 2 ? (form.rpsWinner || null) : null,
     };
     const { error } = editingPlay
       ? await supabase.from("plays").update(payload).eq("id", editingPlay.id)
@@ -233,13 +248,36 @@ export default function App() {
     notify(`${name} joined the crew!`);
   }
 
+  async function updatePlayerColor(name, color) {
+    const { error } = await supabase.from("players").update({ color }).eq("name", name);
+    if (error) { alert("Error: " + error.message); return; }
+    await loadAll();
+    setSelectedPlayer(p => ({ ...p, color }));
+    notify("Color updated!");
+  }
+
+  async function updatePlayerAlias(name, alias) {
+    const val = alias.trim() || null;
+    const { error } = await supabase.from("players").update({ alias: val }).eq("name", name);
+    if (error) { alert("Error: " + error.message); return; }
+    await loadAll();
+    setSelectedPlayer(p => ({ ...p, alias: val || "" }));
+    notify(val ? "Alias saved!" : "Alias cleared.");
+  }
+
   // ── Stats ──────────────────────────────────────────────────────────────────
   const stats = {};
   players.forEach(p => { stats[p.name] = { plays: 0, wins: 0 }; });
+  const rpsWins = {};
   plays.forEach(play => {
     play.players.forEach(p => { if (stats[p]) stats[p].plays++; });
     play.winners.forEach(p => { if (stats[p]) stats[p].wins++; });
+    if (play.rps_winner && play.rps_players?.length >= 2) rpsWins[play.rps_winner] = (rpsWins[play.rps_winner] || 0) + 1;
   });
+  const rpsLeaderboard = players
+    .filter(p => rpsWins[p.name])
+    .map(p => ({ ...p, rpsWins: rpsWins[p.name] }))
+    .sort((a, b) => b.rpsWins - a.rpsWins);
   const gameCounts = {};
   const gameLastPlayed = {};
   const gameWinCounts = {};
@@ -255,7 +293,7 @@ export default function App() {
     if (!sorted.length) return;
     const maxWins = sorted[0][1];
     const tied = sorted.filter(([, w]) => w === maxWins);
-    gameTopWinner[game] = { name: tied.map(([n]) => n).join(" & "), wins: maxWins };
+    gameTopWinner[game] = { name: tied.map(([n]) => getAlias(n, players)).join(" & "), wins: maxWins };
   });
   const topGame = Object.entries(gameCounts).sort((a,b) => b[1]-a[1])[0];
   const leaderboard = players.map(p => ({ ...p, ...stats[p.name] })).sort((a,b) => b.wins - a.wins || b.plays - a.plays);
@@ -305,9 +343,10 @@ export default function App() {
             {/* PLAYS TAB */}
             {tab === "plays" && (
               <div>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                <div style={{ display: "flex", alignItems: "center", marginBottom: 16 }}>
+                  <div style={{ flex: 1 }} />
                   <h2 style={{ fontFamily: "'Playfair Display', serif", color: "#ffffff", margin: 0, fontSize: 21 }}>Recent Plays</h2>
-                  <Btn onClick={() => { resetForm(); setShowAddPlay(true); }}>+ Log Play</Btn>
+                  <div style={{ flex: 1, display: "flex", justifyContent: "flex-end" }}><Btn onClick={() => { resetForm(); setShowAddPlay(true); }}>+ Log Play</Btn></div>
                 </div>
                 {plays.length === 0 && (
                   <div style={{ textAlign: "center", padding: "48px 0", color: "#ffffff" }}>
@@ -327,14 +366,15 @@ export default function App() {
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
                       <span style={{ fontFamily: "'Playfair Display', serif", fontWeight: 700, color: "#ffffff", fontSize: 19, flex: 1 }}>{play.game}</span>
                       {play.coop && <span style={{ fontSize: 12, background: "#1a2e3a", color: "#70b090", padding: "2px 7px", borderRadius: 10, fontFamily: "monospace" }}>CO-OP</span>}
+                      {play.rps_winner && <span style={{ fontSize: 12, background: "#1e2a3a", color: "#90b8e8", padding: "2px 7px", borderRadius: 10, fontFamily: "monospace" }}>✌️ {getAlias(play.rps_winner, players)}</span>}
                       <span style={{ color: "#ffffff", fontSize: 14, fontFamily: "monospace" }}>{play.date}</span>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                      {play.players.map(p => <Avatar key={p} name={p} color={getPlayerColor(p, players)} size={26} />)}
+                      {play.players.map(p => <Avatar key={p} name={getAlias(p, players)} color={getPlayerColor(p, players)} size={26} />)}
                       {play.winners.length > 0 && (
                         <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "#2a2010", border: "1px solid #6a5020", borderRadius: 8, padding: "4px 10px", marginLeft: "auto" }}>
                           <span style={{ fontSize: 14 }}>🏆</span>
-                          <span style={{ fontSize: 15, color: "#e8c050", fontFamily: "'Playfair Display', serif", fontWeight: 700 }}>{play.winners.join(" & ")}</span>
+                          <span style={{ fontSize: 15, color: "#e8c050", fontFamily: "'Playfair Display', serif", fontWeight: 700 }}>{play.winners.map(w => getAlias(w, players)).join(" & ")}</span>
                         </div>
                       )}
                     </div>
@@ -342,7 +382,7 @@ export default function App() {
                       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
                         {play.players.filter(p => play.scores[p]).map(p => (
                           <span key={p} style={{ fontSize: 13, fontFamily: "monospace", color: "#ffffff" }}>
-                            {p}: <span style={{ color: "#ffffff" }}>{play.scores[p]}</span>
+                            {getAlias(p, players)}: <span style={{ color: "#ffffff" }}>{play.scores[p]}</span>
                           </span>
                         ))}
                       </div>
@@ -356,9 +396,10 @@ export default function App() {
             {/* LIBRARY TAB */}
             {tab === "library" && (
               <div>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                <div style={{ display: "flex", alignItems: "center", marginBottom: 16 }}>
+                  <div style={{ flex: 1 }} />
                   <h2 style={{ fontFamily: "'Playfair Display', serif", color: "#ffffff", margin: 0, fontSize: 21 }}>Game Library</h2>
-                  <Btn onClick={() => setShowAddGame(true)}>+ Add Game</Btn>
+                  <div style={{ flex: 1, display: "flex", justifyContent: "flex-end" }}><Btn onClick={() => setShowAddGame(true)}>+ Add Game</Btn></div>
                 </div>
                 {games.length === 0 && <p style={{ color: "#ffffff", fontStyle: "italic" }}>No games yet — add some!</p>}
                 <div style={{ display: "grid", gridTemplateColumns: isDesktop ? "1fr 1fr 1fr" : "1fr 1fr", gap: 10 }}>
@@ -388,9 +429,10 @@ export default function App() {
             {/* PLAYERS TAB */}
             {tab === "players" && (
               <div>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                <div style={{ display: "flex", alignItems: "center", marginBottom: 16 }}>
+                  <div style={{ flex: 1 }} />
                   <h2 style={{ fontFamily: "'Playfair Display', serif", color: "#ffffff", margin: 0, fontSize: 21 }}>Players</h2>
-                  <Btn onClick={() => setShowAddPlayer(true)}>+ Add Player</Btn>
+                  <div style={{ flex: 1, display: "flex", justifyContent: "flex-end" }}><Btn onClick={() => setShowAddPlayer(true)}>+ Add Player</Btn></div>
                 </div>
                 {players.length === 0 && <p style={{ color: "#ffffff", fontStyle: "italic" }}>No players yet — add some!</p>}
                 <div style={{ display: isDesktop ? "grid" : "block", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
@@ -403,9 +445,9 @@ export default function App() {
                   }}
                   onMouseEnter={e => { e.currentTarget.style.borderColor = "#4a6890"; e.currentTarget.style.transform = "translateY(-1px)"; }}
                   onMouseLeave={e => { e.currentTarget.style.borderColor = "#2c3d58"; e.currentTarget.style.transform = "none"; }}>
-                    <Avatar name={p.name} color={p.color} size={42} />
+                    <Avatar name={p.alias || p.name} color={p.color} size={42} />
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontFamily: "'Playfair Display', serif", color: "#ffffff", fontSize: 19, fontWeight: 700 }}>{p.name}</div>
+                      <div style={{ fontFamily: "'Playfair Display', serif", color: "#ffffff", fontSize: 19, fontWeight: 700 }}>{p.alias || p.name}</div>
                       <div style={{ fontSize: 14, color: "#ffffff", marginTop: 2 }}>
                         {stats[p.name]?.plays || 0} plays · {stats[p.name]?.wins || 0} wins
                         {stats[p.name]?.plays > 0 && ` · ${Math.round((stats[p.name].wins / stats[p.name].plays) * 100)}% win rate`}
@@ -420,12 +462,13 @@ export default function App() {
             {/* STATS TAB */}
             {tab === "stats" && (
               <div>
-                <h2 style={{ fontFamily: "'Playfair Display', serif", color: "#ffffff", margin: "0 0 16px", fontSize: 21 }}>Leaderboard</h2>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 20 }}>
+                <h2 style={{ fontFamily: "'Playfair Display', serif", color: "#ffffff", margin: "0 0 16px", fontSize: 21, textAlign: "center" }}>Leaderboard</h2>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
                   {[
                     { label: "Total Plays", value: plays.length, icon: "🎲" },
                     { label: "Games", value: games.length, icon: "📚" },
-                    { label: "Top Game", value: topGame ? topGame[0] : "—", icon: "⭐" },
+                    { label: "Top Game", value: topGame ? `${topGame[0]} | ${topGame[1]} Plays` : "—", icon: "⭐" },
+                    { label: "RPS Leader", value: rpsLeaderboard.length > 0 ? `${rpsLeaderboard[0].alias || rpsLeaderboard[0].name} | ${rpsLeaderboard[0].rpsWins} Wins` : "—", icon: "✌️" },
                   ].map(s => (
                     <div key={s.label} style={{ background: "#1e2535", border: "1px solid #2c3d58", borderRadius: 10, padding: 12, textAlign: "center" }}>
                       <div style={{ fontSize: 25 }}>{s.icon}</div>
@@ -436,6 +479,9 @@ export default function App() {
                 </div>
                 {leaderboard.map((p, i) => {
                   const winRate = p.plays > 0 ? Math.round((p.wins / p.plays) * 100) : 0;
+                  const playerRpsWins = rpsWins[p.name] || 0;
+                  const playerRpsPlays = plays.filter(pl => pl.rps_players?.includes(p.name)).length;
+                  const rpsRate = playerRpsPlays > 0 ? Math.round((playerRpsWins / playerRpsPlays) * 100) : null;
                   return (
                     <div key={p.name} onClick={() => setSelectedPlayer(p)} style={{
                       background: i === 0 && p.wins > 0 ? "linear-gradient(135deg,#1e2a40,#1e2535)" : "#1e2535",
@@ -449,11 +495,17 @@ export default function App() {
                       <div style={{ width: 28, textAlign: "center", fontFamily: "'Playfair Display', serif", fontWeight: 700, fontSize: 19, color: i < 3 ? ["#d4aa3a","#c0c0c0","#cd8540"][i] : "#ffffff" }}>
                         {i < 3 ? ["🥇","🥈","🥉"][i] : i + 1}
                       </div>
-                      <Avatar name={p.name} color={p.color} size={38} />
+                      <Avatar name={p.alias || p.name} color={p.color} size={38} />
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontFamily: "'Playfair Display', serif", color: "#ffffff", fontWeight: 700 }}>{p.name}</div>
+                        <div style={{ fontFamily: "'Playfair Display', serif", color: "#ffffff", fontWeight: 700 }}>{p.alias || p.name}</div>
                         <div style={{ fontSize: 14, color: "#ffffff" }}>{p.plays} plays · {p.wins} wins</div>
                       </div>
+                      {rpsRate !== null && (
+                        <div style={{ textAlign: "right", marginRight: 16 }}>
+                          <div style={{ fontFamily: "'Playfair Display', serif", color: "#90b8e8", fontWeight: 700, fontSize: 21 }}>{rpsRate}%</div>
+                          <div style={{ fontSize: 12, color: "#ffffff", fontFamily: "monospace" }}>RPS RATE</div>
+                        </div>
+                      )}
                       <div style={{ textAlign: "right" }}>
                         <div style={{ fontFamily: "'Playfair Display', serif", color: "#d4aa3a", fontWeight: 700, fontSize: 21 }}>{winRate}%</div>
                         <div style={{ fontSize: 12, color: "#ffffff", fontFamily: "monospace" }}>WIN RATE</div>
@@ -493,7 +545,7 @@ export default function App() {
                     background: sel ? `${p.color}22` : "transparent", cursor: "pointer",
                     color: sel ? p.color : "#485c78", fontFamily: "Georgia, serif", fontSize: 15
                   }}>
-                    <Avatar name={p.name} color={p.color} size={20} />{p.name}
+                    <Avatar name={p.alias || p.name} color={p.color} size={20} />{p.alias || p.name}
                   </button>
                 );
               })}
@@ -502,24 +554,49 @@ export default function App() {
           {form.selectedPlayers.length >= 2 && (
             <>
               <div style={{ marginBottom: 14 }}>
-                <label style={{ display: "block", color: "#ffffff", fontSize: 14, fontFamily: "monospace", letterSpacing: 1, textTransform: "uppercase", marginBottom: 8 }}>✌️ RPS — Who Goes First? <span style={{ color: "#ffffff" }}>(optional)</span></label>
+                <label style={{ display: "block", color: "#ffffff", fontSize: 14, fontFamily: "monospace", letterSpacing: 1, textTransform: "uppercase", marginBottom: 8 }}>✌️ RPS Participants <span style={{ opacity: 0.5 }}>(optional)</span></label>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                   {form.selectedPlayers.map(name => {
-                    const sel = form.rpsWinner === name;
+                    const sel = form.rpsPlayers.includes(name);
                     const p = players.find(x => x.name === name);
                     return (
-                      <button key={name} onClick={() => setForm(f => ({ ...f, rpsWinner: sel ? "" : name }))} style={{
+                      <button key={name} onClick={() => setForm(f => {
+                        const rpsPlayers = sel ? f.rpsPlayers.filter(n => n !== name) : [...f.rpsPlayers, name];
+                        const rpsWinner = rpsPlayers.length >= 2 && rpsPlayers.includes(f.rpsWinner) ? f.rpsWinner : "";
+                        return { ...f, rpsPlayers, rpsWinner };
+                      })} style={{
                         display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 20,
-                        border: sel ? `1px solid #70b090` : "1px solid #2c3d58",
+                        border: sel ? "1px solid #70b090" : "1px solid #2c3d58",
                         background: sel ? "#1a3028" : "transparent", cursor: "pointer",
-                        color: sel ? "#70b090" : "#485c78", fontFamily: "Georgia, serif", fontSize: 15
+                        color: sel ? "#70b090" : "#ffffff", fontFamily: "Georgia, serif", fontSize: 15
                       }}>
-                        <Avatar name={name} color={p?.color || "#888"} size={20} />{name}
+                        <Avatar name={getAlias(name, players)} color={p?.color || "#888"} size={20} />{getAlias(name, players)}
                       </button>
                     );
                   })}
                 </div>
               </div>
+              {form.rpsPlayers.length >= 2 && (
+              <div style={{ marginBottom: 14 }}>
+                <label style={{ display: "block", color: "#ffffff", fontSize: 14, fontFamily: "monospace", letterSpacing: 1, textTransform: "uppercase", marginBottom: 8 }}>✌️ RPS Winner</label>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {form.rpsPlayers.map(name => {
+                    const sel = form.rpsWinner === name;
+                    const p = players.find(x => x.name === name);
+                    return (
+                      <button key={name} onClick={() => setForm(f => ({ ...f, rpsWinner: sel ? "" : name }))} style={{
+                        display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 20,
+                        border: sel ? "1px solid #90b8e8" : "1px solid #2c3d58",
+                        background: sel ? "#1a2838" : "transparent", cursor: "pointer",
+                        color: sel ? "#90b8e8" : "#ffffff", fontFamily: "Georgia, serif", fontSize: 15
+                      }}>
+                        <Avatar name={getAlias(name, players)} color={p?.color || "#888"} size={20} />{getAlias(name, players)}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              )}
               <div style={{ marginBottom: 14 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                   <label style={{ color: "#ffffff", fontSize: 14, fontFamily: "monospace", letterSpacing: 1, textTransform: "uppercase" }}>Winner{form.coop ? "s" : ""}</label>
@@ -538,7 +615,7 @@ export default function App() {
                         background: win ? "#2a2510" : "transparent", cursor: "pointer",
                         color: win ? "#d4aa3a" : "#485c78", fontFamily: "Georgia, serif", fontSize: 15
                       }}>
-                        {win && "🏆 "}{name}
+                        {win && "🏆 "}{getAlias(name, players)}
                       </button>
                     );
                   })}
@@ -549,7 +626,7 @@ export default function App() {
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                   {form.selectedPlayers.map(name => (
                     <div key={name} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <Avatar name={name} color={getPlayerColor(name, players)} size={22} />
+                      <Avatar name={getAlias(name, players)} color={getPlayerColor(name, players)} size={22} />
                       <input type="number" placeholder="Score" value={form.scores[name] || ""} onChange={e => setForm(f => ({ ...f, scores: { ...f.scores, [name]: e.target.value } }))} style={{
                         flex: 1, background: "#252e40", border: "1px solid #364a6a", borderRadius: 6,
                         color: "#ffffff", padding: "7px 10px", fontSize: 15, outline: "none", boxSizing: "border-box"
@@ -597,7 +674,7 @@ export default function App() {
           <div style={{ marginBottom: 12, fontSize: 15, color: "#ffffff", fontFamily: "monospace" }}>{selectedPlay.date}</div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
             {selectedPlay.coop && <span style={{ fontSize: 13, background: "#1a2e3a", color: "#70b090", padding: "2px 8px", borderRadius: 10, fontFamily: "monospace" }}>CO-OP</span>}
-            {selectedPlay.rps_winner && <span style={{ fontSize: 13, background: "#1a2e3a", color: "#70b090", padding: "2px 8px", borderRadius: 10, fontFamily: "monospace" }}>✌️ {selectedPlay.rps_winner} went first</span>}
+            {selectedPlay.rps_winner && <span style={{ fontSize: 13, background: "#1a2e3a", color: "#70b090", padding: "2px 8px", borderRadius: 10, fontFamily: "monospace" }}>✌️ {getAlias(selectedPlay.rps_winner, players)} went first</span>}
           </div>
           <div style={{ color: "#ffffff", fontSize: 13, fontFamily: "monospace", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>Players</div>
           {selectedPlay.players.map(name => {
@@ -606,8 +683,8 @@ export default function App() {
             const score = selectedPlay.scores?.[name];
             return (
               <div key={name} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-                <Avatar name={name} color={p?.color || "#888"} size={32} />
-                <span style={{ fontFamily: "'Playfair Display', serif", color: isWinner ? "#d4aa3a" : "#ffffff", flex: 1 }}>{name} {isWinner && "🏆"}</span>
+                <Avatar name={getAlias(name, players)} color={p?.color || "#888"} size={32} />
+                <span style={{ fontFamily: "'Playfair Display', serif", color: isWinner ? "#d4aa3a" : "#ffffff", flex: 1 }}>{getAlias(name, players)} {isWinner && "🏆"}</span>
                 {score && <span style={{ fontFamily: "monospace", color: "#ffffff", fontSize: 16 }}>{score} pts</span>}
               </div>
             );
@@ -632,7 +709,7 @@ export default function App() {
             <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
               {[
                 { label: "Times Played", value: gamePlays.length },
-                { label: "Top Winner", value: topWinner ? topWinner[0] : "—" },
+                { label: "Top Winner", value: topWinner ? getAlias(topWinner[0], players) : "—" },
                 { label: "Top Wins", value: topWinner ? topWinner[1] : "—" },
               ].map(s => (
                 <div key={s.label} style={{ flex: 1, background: "#252e40", borderRadius: 8, padding: "10px 8px", textAlign: "center" }}>
@@ -648,16 +725,16 @@ export default function App() {
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
                   <span style={{ fontSize: 13, color: "#ffffff", fontFamily: "monospace" }}>{play.date}</span>
                   {play.coop && <span style={{ fontSize: 12, background: "#1a2e3a", color: "#70b090", padding: "2px 7px", borderRadius: 10, fontFamily: "monospace" }}>CO-OP</span>}
-                  {play.winners.length > 0 && <span style={{ fontSize: 14, color: "#d4aa3a" }}>🏆 {play.winners.join(", ")}</span>}
+                  {play.winners.length > 0 && <span style={{ fontSize: 14, color: "#d4aa3a" }}>🏆 {play.winners.map(w => getAlias(w, players)).join(", ")}</span>}
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                  {play.players.map(p => <Avatar key={p} name={p} color={getPlayerColor(p, players)} size={22} />)}
+                  {play.players.map(p => <Avatar key={p} name={getAlias(p, players)} color={getPlayerColor(p, players)} size={22} />)}
                 </div>
                 {play.scores && Object.keys(play.scores).length > 0 && (
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 6 }}>
                     {play.players.filter(p => play.scores[p]).map(p => (
                       <span key={p} style={{ fontSize: 13, fontFamily: "monospace", color: "#ffffff" }}>
-                        {p}: <span style={{ color: "#ffffff" }}>{play.scores[p]}</span>
+                        {getAlias(p, players)}: <span style={{ color: "#ffffff" }}>{play.scores[p]}</span>
                       </span>
                     ))}
                   </div>
@@ -681,12 +758,13 @@ export default function App() {
         const topWinGame  = Object.entries(winsByGame).sort((a, b) => b[1] - a[1])[0];
         const recentPlays = [...playerPlays].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 10);
         const leadingGames = Object.entries(gameTopWinner)
-          .filter(([, v]) => v.name.split(" & ").includes(selectedPlayer.name))
+          .filter(([, v]) => v.name.split(" & ").includes(selectedPlayer.alias || selectedPlayer.name))
           .sort((a, b) => b[1].wins - a[1].wins);
+        const displayName = selectedPlayer.alias || selectedPlayer.name;
         return (
-          <Modal title={selectedPlayer.name} onClose={() => setSelectedPlayer(null)}>
-            <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 20 }}>
-              <Avatar name={selectedPlayer.name} color={selectedPlayer.color} size={52} />
+          <Modal title={displayName} onClose={() => setSelectedPlayer(null)}>
+            <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 16 }}>
+              <Avatar name={displayName} color={selectedPlayer.color} size={52} />
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, flex: 1 }}>
                 {[
                   { label: "Played", value: playerPlays.length },
@@ -698,6 +776,30 @@ export default function App() {
                     <div style={{ fontSize: 12, color: "#ffffff", fontFamily: "monospace", textTransform: "uppercase", letterSpacing: 0.5, marginTop: 2 }}>{s.label}</div>
                   </div>
                 ))}
+              </div>
+            </div>
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 12, color: "#ffffff", fontFamily: "monospace", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>Player Color</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {COLOR_PALETTE.map(c => (
+                  <div key={c} onClick={() => updatePlayerColor(selectedPlayer.name, c)} style={{
+                    width: 28, height: 28, borderRadius: "50%", background: c, cursor: "pointer",
+                    border: selectedPlayer.color === c ? "3px solid #ffffff" : "3px solid transparent",
+                    boxSizing: "border-box", transition: "transform .1s",
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.transform = "scale(1.2)"}
+                  onMouseLeave={e => e.currentTarget.style.transform = "scale(1)"} />
+                ))}
+              </div>
+            </div>
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 12, color: "#ffffff", fontFamily: "monospace", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>Alias <span style={{ opacity: 0.5 }}>(optional nickname)</span></div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <input value={aliasInput} onChange={e => setAliasInput(e.target.value)} placeholder={selectedPlayer.name} style={{
+                  flex: 1, background: "#252e40", border: "1px solid #364a6a", borderRadius: 8,
+                  color: "#ffffff", padding: "9px 12px", fontSize: 15, fontFamily: "Georgia, serif", outline: "none"
+                }} />
+                <Btn onClick={() => updatePlayerAlias(selectedPlayer.name, aliasInput)}>Save</Btn>
               </div>
             </div>
             {topWinGame && (
