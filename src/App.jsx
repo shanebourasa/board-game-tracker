@@ -282,11 +282,11 @@ export default function App() {
                     <p style={{ fontStyle: "italic" }}>No plays logged yet. Start by clicking "Log Play"!</p>
                   </div>
                 )}
-                <div style={{ display: isDesktop ? "grid" : "block", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                {plays.map(play => (
+                <div>
+                {[...plays].sort((a, b) => new Date(b.date) - new Date(a.date) || new Date(b.created_at) - new Date(a.created_at)).map(play => (
                   <div key={play.id} onClick={() => setSelectedPlay(play)} style={{
                     background: "#1e2535", border: "1px solid #2c3d58", borderRadius: 12,
-                    padding: "14px 16px", marginBottom: isDesktop ? 0 : 10, cursor: "pointer",
+                    padding: "14px 16px", marginBottom: 10, cursor: "pointer",
                     transition: "border-color .15s, transform .1s",
                   }}
                   onMouseEnter={e => { e.currentTarget.style.borderColor = "#4a6890"; e.currentTarget.style.transform = "translateY(-1px)"; }}
