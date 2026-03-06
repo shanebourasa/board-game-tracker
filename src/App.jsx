@@ -128,8 +128,9 @@ export default function App() {
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [selectedGame, setSelectedGame]   = useState(null);
   const [saving, setSaving]               = useState(false);
+  const [editingPlay, setEditingPlay]     = useState(null);
 
-  const [form, setForm]         = useState({ game: "", date: new Date().toISOString().slice(0,10), selectedPlayers: [], winners: [], scores: {}, coop: false });
+  const [form, setForm]         = useState({ game: "", date: new Date().toISOString().slice(0,10), selectedPlayers: [], winners: [], scores: {}, coop: false, rpsWinner: "" });
   const [newGame, setNewGame]   = useState("");
   const [newPlayer, setNewPlayer] = useState("");
 
@@ -150,7 +151,7 @@ export default function App() {
   useEffect(() => { loadAll(); }, [loadAll]);
 
   function notify(msg) { setToast(msg); }
-  function resetForm() { setForm({ game: "", date: new Date().toISOString().slice(0,10), selectedPlayers: [], winners: [], scores: {}, coop: false }); }
+  function resetForm() { setForm({ game: "", date: new Date().toISOString().slice(0,10), selectedPlayers: [], winners: [], scores: {}, coop: false, rpsWinner: "" }); }
 
   // ── Form helpers ───────────────────────────────────────────────────────────
   function togglePlayer(name) {
@@ -168,20 +169,37 @@ export default function App() {
     );
   }
 
+  function startEditPlay(play) {
+    setForm({
+      game: play.game, date: play.date, selectedPlayers: play.players,
+      winners: play.winners, scores: play.scores || {}, coop: play.coop || false,
+      rpsWinner: play.rps_winner || "",
+    });
+    setEditingPlay(play);
+    setSelectedPlay(null);
+    setSelectedGame(null);
+    setShowAddPlay(true);
+  }
+
   // ── Mutations ──────────────────────────────────────────────────────────────
   async function submitPlay() {
     if (!form.game || form.selectedPlayers.length < 2 || saving) return;
     setSaving(true);
-    const { error } = await supabase.from("plays").insert({
+    const payload = {
       game: form.game, date: form.date, players: form.selectedPlayers,
       winners: form.winners, scores: form.scores, coop: form.coop,
-    });
+      rps_winner: form.rpsWinner || null,
+    };
+    const { error } = editingPlay
+      ? await supabase.from("plays").update(payload).eq("id", editingPlay.id)
+      : await supabase.from("plays").insert(payload);
     setSaving(false);
     if (error) { alert("Error saving play: " + error.message); return; }
     await loadAll();
     setShowAddPlay(false);
+    setEditingPlay(null);
     resetForm();
-    notify("Play logged! 🎲");
+    notify(editingPlay ? "Play updated!" : "Play logged! 🎲");
   }
 
   async function deletePlay(id) {
@@ -424,7 +442,7 @@ export default function App() {
 
       {/* ── ADD PLAY MODAL ── */}
       {showAddPlay && (
-        <Modal title="Log a Play" onClose={() => setShowAddPlay(false)}>
+        <Modal title={editingPlay ? "Edit Play" : "Log a Play"} onClose={() => { setShowAddPlay(false); setEditingPlay(null); resetForm(); }}>
           <div style={{ marginBottom: 14 }}>
             <label style={{ display: "block", color: "#7a9fd4", fontSize: 12, fontFamily: "monospace", letterSpacing: 1, textTransform: "uppercase", marginBottom: 5 }}>Game</label>
             <select value={form.game} onChange={e => setForm(f => ({ ...f, game: e.target.value }))} style={{
@@ -456,6 +474,25 @@ export default function App() {
           </div>
           {form.selectedPlayers.length >= 2 && (
             <>
+              <div style={{ marginBottom: 14 }}>
+                <label style={{ display: "block", color: "#7a9fd4", fontSize: 12, fontFamily: "monospace", letterSpacing: 1, textTransform: "uppercase", marginBottom: 8 }}>✌️ RPS — Who Goes First? <span style={{ color: "#485c78" }}>(optional)</span></label>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {form.selectedPlayers.map(name => {
+                    const sel = form.rpsWinner === name;
+                    const p = players.find(x => x.name === name);
+                    return (
+                      <button key={name} onClick={() => setForm(f => ({ ...f, rpsWinner: sel ? "" : name }))} style={{
+                        display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 20,
+                        border: sel ? `1px solid #70b090` : "1px solid #2c3d58",
+                        background: sel ? "#1a3028" : "transparent", cursor: "pointer",
+                        color: sel ? "#70b090" : "#485c78", fontFamily: "Georgia, serif", fontSize: 13
+                      }}>
+                        <Avatar name={name} color={p?.color || "#888"} size={20} />{name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
               <div style={{ marginBottom: 14 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                   <label style={{ color: "#7a9fd4", fontSize: 12, fontFamily: "monospace", letterSpacing: 1, textTransform: "uppercase" }}>Winner{form.coop ? "s" : ""}</label>
@@ -497,9 +534,9 @@ export default function App() {
             </>
           )}
           <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-            <Btn variant="secondary" onClick={() => setShowAddPlay(false)}>Cancel</Btn>
+            <Btn variant="secondary" onClick={() => { setShowAddPlay(false); setEditingPlay(null); resetForm(); }}>Cancel</Btn>
             <Btn onClick={submitPlay} style={{ opacity: (!form.game || form.selectedPlayers.length < 2 || saving) ? 0.4 : 1 }}>
-              {saving ? "Saving…" : "Save Play"}
+              {saving ? "Saving…" : editingPlay ? "Update Play" : "Save Play"}
             </Btn>
           </div>
         </Modal>
@@ -531,7 +568,10 @@ export default function App() {
       {selectedPlay && (
         <Modal title={selectedPlay.game} onClose={() => setSelectedPlay(null)}>
           <div style={{ marginBottom: 12, fontSize: 13, color: "#6080a0", fontFamily: "monospace" }}>{selectedPlay.date}</div>
-          {selectedPlay.coop && <div style={{ marginBottom: 10 }}><span style={{ fontSize: 11, background: "#1a2e3a", color: "#70b090", padding: "2px 8px", borderRadius: 10, fontFamily: "monospace" }}>CO-OP</span></div>}
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+            {selectedPlay.coop && <span style={{ fontSize: 11, background: "#1a2e3a", color: "#70b090", padding: "2px 8px", borderRadius: 10, fontFamily: "monospace" }}>CO-OP</span>}
+            {selectedPlay.rps_winner && <span style={{ fontSize: 11, background: "#1a2e3a", color: "#70b090", padding: "2px 8px", borderRadius: 10, fontFamily: "monospace" }}>✌️ {selectedPlay.rps_winner} went first</span>}
+          </div>
           <div style={{ color: "#7a9fd4", fontSize: 11, fontFamily: "monospace", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>Players</div>
           {selectedPlay.players.map(name => {
             const p = players.find(x => x.name === name);
@@ -546,7 +586,8 @@ export default function App() {
             );
           })}
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 16 }}>
-            <Btn variant="danger" onClick={() => deletePlay(selectedPlay.id)}>Delete Play</Btn>
+            <Btn variant="danger" onClick={() => deletePlay(selectedPlay.id)}>Delete</Btn>
+            <Btn variant="secondary" onClick={() => startEditPlay(selectedPlay)}>Edit</Btn>
             <Btn variant="secondary" onClick={() => setSelectedPlay(null)}>Close</Btn>
           </div>
         </Modal>
@@ -576,7 +617,7 @@ export default function App() {
             <div style={{ color: "#7a9fd4", fontSize: 11, fontFamily: "monospace", textTransform: "uppercase", letterSpacing: 1, marginBottom: 10 }}>Recent Plays</div>
             {recentPlays.length === 0 && <p style={{ color: "#485c78", fontStyle: "italic", fontSize: 13 }}>No plays yet.</p>}
             {recentPlays.map(play => (
-              <div key={play.id} style={{ background: "#252e40", borderRadius: 8, padding: "8px 10px", marginBottom: 8 }}>
+              <div key={play.id} onClick={() => { setSelectedGame(null); setSelectedPlay(play); }} style={{ background: "#252e40", borderRadius: 8, padding: "8px 10px", marginBottom: 8, cursor: "pointer" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
                   <span style={{ fontSize: 11, color: "#485c78", fontFamily: "monospace" }}>{play.date}</span>
                   {play.coop && <span style={{ fontSize: 10, background: "#1a2e3a", color: "#70b090", padding: "2px 7px", borderRadius: 10, fontFamily: "monospace" }}>CO-OP</span>}
